@@ -91,25 +91,49 @@ def alignment(A, B, sigma=1.5, normalized=True):
     I = mutual_information(A, B, normalized=normalized)
     G = np.sum(gradient_similarity(A, B, sigma=sigma))
 
-    return I # * G
+    return I * G
+
+
+def build_tf(p):
+    r, tx, ty = p
+    return transform.SimilarityTransform(rotation=r,
+                                         translation=(tx, ty))
 
 
 # Generalize this for N-d
 def register(A, B):
-    def build_tf(p):
-        r, tx, ty = p
-        return transform.SimilarityTransform(rotation=r,
-                                             translation=(tx, ty))
 
-    def cost(p):
+    def cost(p, X, Y):
         tf = build_tf(p)
-        B_prime = transform.warp(B, tf, order=3)
+        Y_prime = transform.warp(Y, tf, order=1)
 
-        return -1 * alignment(A, B_prime, sigma=1.5)
+        return -1 * alignment(X, Y_prime)
 
-    res = optimize.minimize(cost, [0, 0, 0], callback=lambda x: print('x->', x),
+    sigma = 10
+    A_blurred = ndi.gaussian_filter(A, sigma=sigma,
+                                    mode='constant', cval=0)
+    B_blurred = ndi.gaussian_filter(B, sigma=sigma,
+                                    mode='constant', cval=0)
+
+    res = optimize.minimize(cost,
+                            [0, 0, 0],
+                            args=(A_blurred, B_blurred),
+                            callback=lambda x: print('x->', x),
                             method='Powell')
     print('opt:', res.x)
+    print('opt angle:', np.rad2deg(res.x[0]))
+    print('cost:', res.fun)
+
+    print('Refinement:')
+    res = optimize.minimize(cost,
+                            res.x,
+                            args=(A, B),
+                            callback=lambda x: print('x->', x),
+                            method='Powell')
+    print('opt:', res.x)
+    print('opt angle:', np.rad2deg(res.x[0]))
+    print('cost:', res.fun)
+
 
     return build_tf(res.x)
 
@@ -118,10 +142,12 @@ if __name__ == "__main__":
     from skimage import data, transform, color
 
     img0 = transform.rescale(color.rgb2gray(data.astronaut()), 0.3)
+    #R = build_tf([np.deg2rad(30), 15, -5])
+    #img1 = transform.warp(img0, R, order=3)
     img1 = transform.rotate(img0, 30)
 
     tf = register(img0, img1)
-    corrected = transform.warp(img1, tf)
+    corrected = transform.warp(img1, tf, order=3)
 
     import matplotlib.pyplot as plt
 
