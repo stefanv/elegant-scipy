@@ -114,16 +114,15 @@ def build_tf(p):
                                          translation=(tx, ty))
 
 
+def cost(p, X, Y):
+    tf = build_tf(p)
+    Y_prime = transform.warp(Y, tf, order=3)
+
+    return -1 * alignment(X, Y_prime)
+
+
 # Generalize this for N-d
 def register(A, B):
-
-    def cost(p, X, Y):
-        tf = build_tf(p)
-        Y_prime = transform.warp(Y, tf, order=3)
-
-        return -1 * alignment(X, Y_prime)
-
-
     pyramid_A = tuple(transform.pyramid_gaussian(A, downscale=2))
     pyramid_B = tuple(transform.pyramid_gaussian(B, downscale=2))
     N = range(len(pyramid_A))
@@ -161,17 +160,31 @@ if __name__ == "__main__":
 
     img0 = transform.rescale(color.rgb2gray(data.astronaut()), 0.3)
 
-    img1 = transform.rotate(img0, 40)
+    theta = 40
+    img1 = transform.rotate(img0, theta)
     img1 = random_noise(img1, mode='gaussian', seed=0, mean=0, var=1e-3)
 
     tf = register(img0, img1)
     corrected = transform.warp(img1, tf, order=3)
 
+
     import matplotlib.pyplot as plt
 
     f, (ax0, ax1, ax2) = plt.subplots(1, 3)
     ax0.imshow(img0, cmap='gray')
+    ax0.set_title('Input image')
     ax1.imshow(img1, cmap='gray')
+    ax1.set_title('Transformed image + noise')
     ax2.imshow(corrected, cmap='gray')
+    ax2.set_title('Registered image')
+
+    print('Calculating cost function profile...')
+    f, ax0 = plt.subplots()
+    angles = np.linspace(-theta - 20, -theta + 20, 51)
+    costs = [-1 * alignment(img0, transform.rotate(img1, angle)) for angle in angles]
+    ax0.plot(angles, costs)
+    ax0.set_title('Cost function around angle of interest')
+    ax0.set_xlabel('Angle')
+    ax0.set_ylabel('Cost')
 
     plt.show()
