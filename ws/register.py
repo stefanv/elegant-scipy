@@ -1,3 +1,13 @@
+"""
+
+Implementation of:
+
+ Pluim et al., Image registration by maximization of combined mutual
+ information and gradient information, IEEE Transactions on Medical
+ Imaging, 19(8) 2000
+
+"""
+
 import numpy as np
 
 from scipy.stats import entropy
