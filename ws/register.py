@@ -6,6 +6,9 @@ Implementation of:
  information and gradient information, IEEE Transactions on Medical
  Imaging, 19(8) 2000
 
+ Pluim et al., Mutual-Information-Based Registration of Medical
+ Images: A Survey, IEEE Transactions on Medical Imaging, 22(8) 2003
+
 """
 
 import numpy as np
@@ -15,6 +18,7 @@ from scipy import optimize
 from scipy import ndimage as ndi
 
 from skimage import transform
+from skimage.util import random_noise
 
 
 def mutual_information(A, B, normalized=True):
@@ -36,7 +40,7 @@ def mutual_information(A, B, normalized=True):
         Whether or not to normalize the mutual information.
     """
     # TODO: Check if bin edges need to be specified
-    H, bin_edges = np.histogramdd([np.ravel(A), np.ravel(B)], bins=255)
+    H, bin_edges = np.histogramdd([np.ravel(A), np.ravel(B)], bins=100)
     H /= np.sum(H)
 
     H_A = entropy(np.sum(H, axis=0))
@@ -115,46 +119,50 @@ def register(A, B):
 
     def cost(p, X, Y):
         tf = build_tf(p)
-        Y_prime = transform.warp(Y, tf, order=1)
+        Y_prime = transform.warp(Y, tf, order=3)
 
         return -1 * alignment(X, Y_prime)
 
-    sigma = 10
-    A_blurred = ndi.gaussian_filter(A, sigma=sigma,
-                                    mode='constant', cval=0)
-    B_blurred = ndi.gaussian_filter(B, sigma=sigma,
-                                    mode='constant', cval=0)
 
-    res = optimize.minimize(cost,
-                            [0, 0, 0],
-                            args=(A_blurred, B_blurred),
-                            callback=lambda x: print('x->', x),
-                            method='Powell')
-    print('opt:', res.x)
-    print('opt angle:', np.rad2deg(res.x[0]))
-    print('cost:', res.fun)
+    pyramid_A = tuple(transform.pyramid_gaussian(A, downscale=2))
+    pyramid_B = tuple(transform.pyramid_gaussian(B, downscale=2))
+    N = range(len(pyramid_A))
+    image_pairs = zip(N, pyramid_A, pyramid_B)
 
-    print('Refinement:')
-    res = optimize.minimize(cost,
-                            res.x,
-                            args=(A, B),
-                            callback=lambda x: print('x->', x),
-                            method='Powell')
-    print('opt:', res.x)
-    print('opt angle:', np.rad2deg(res.x[0]))
-    print('cost:', res.fun)
+    p = np.array([0, 0, 0])
 
+    for (n, X, Y) in reversed(list(image_pairs)):
+        if X.shape[0] < 5:
+            continue
 
-    return build_tf(res.x)
+        print('   .  ')
+        print('  / \ Pyramid scaled down by 2x {}'.format(n))
+        print(' /   \ ')
+        print('.-----.')
+
+        p[1:] *= 2
+
+        res = optimize.minimize(cost,
+                                p,
+                                args=(X, Y),
+                                method='Powell')
+        p = res.x
+
+        print('Angle:', np.rad2deg(res.x[0]))
+        print('Offset:', res.x[1:] * 2 ** n)
+        print('Cost function:', res.fun)
+        print('')
+
+    return build_tf(p)
 
 
 if __name__ == "__main__":
     from skimage import data, transform, color
 
     img0 = transform.rescale(color.rgb2gray(data.astronaut()), 0.3)
-    #R = build_tf([np.deg2rad(30), 15, -5])
-    #img1 = transform.warp(img0, R, order=3)
-    img1 = transform.rotate(img0, 30)
+
+    img1 = transform.rotate(img0, 40)
+    img1 = random_noise(img1, mode='gaussian', seed=0, mean=0, var=1e-3)
 
     tf = register(img0, img1)
     corrected = transform.warp(img1, tf, order=3)
