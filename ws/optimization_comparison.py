@@ -2,7 +2,6 @@ import numpy as np
 from scipy import optimize
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.colors import LogNorm
 
 
@@ -21,7 +20,7 @@ methods = ['Nelder-Mead',
            'Newton-CG',
            'L-BFGS-B',
            'TNC',
-#           'COBYLA',
+#           'COBYLA',   # does not support callbacks
            'SLSQP',
            'dogleg',
            'trust-ncg'
@@ -55,23 +54,24 @@ def rosenbrock_f(a, b):
     return f, J, H
 
 
-def optimization_paths(axis):
+def optimization_paths():
     rosenbrock, rosenbrock_J, rosenbrock_H = rosenbrock_f(a=1, b=100)
     path = {}
 
-    x, y = np.ogrid[-2:2:0.05, -1:3:0.05]
-    ax.plot_surface(x, y, rosenbrock(x, y), rstride=1, cstride=1,
-                    cmap='viridis', norm=LogNorm(), linewidth=0,
-                    edgecolor='none', alpha=0.4)
+    fig, axes = plt.subplots(4, 3)
+    fig.delaxes(axes[0, 1])
+    fig.suptitle('Comparison of Optimation Methods on Rosenbrock Function')
 
-    ax.set_xlim([-2, 2.0])
-    ax.set_ylim([-1, 3.0])
-    ax.set_zlim([0, 2500])
-    ax.set_aspect('equal')
+    x, y = np.ogrid[-2:2:0.05, -1:3:0.05]
+    extent = (-2, 2, -1, 3)
+
+    z = rosenbrock(x, y).T
+    axes[0, 0].matshow(z, norm=LogNorm(), origin='lower', extent=extent)
+    axes[0, 0].set_title('Cost Function')
 
     x0 = (-0.5, 2.5)
 
-    for method in methods:
+    for n, method in enumerate(methods):
         print('Optimizing with {}'.format(method))
 
         path = [x0]
@@ -83,18 +83,19 @@ def optimization_paths(axis):
                                 callback=lambda p: path.append(p))
 
         path = np.array(path)
-        x, y = path.T
-        ax.plot(x, y, rosenbrock(x, y), linewidth=3, label=method)
-        ax.scatter(path[-1, 0], path[-1, 1] , res.fun, 'o',
-                   s=200, depthshade=False)
+        px, py = path.T
+
+        ax = axes.flat[n + 2]
+
+        ax.contour(z, extent=extent, norm=LogNorm())
+        ax.plot(px, py, linewidth=3)
+        ax.set_aspect('equal')
+        ax.scatter(path[-1, 0], path[-1, 1])
+        ax.set_title(method)
 
     ax.legend()
 
 
 if __name__ == '__main__':
-    fig = plt.figure()
-    ax = Axes3D(fig, azim=-128, elev=43)
-
-    optimization_paths(axis=ax)
-
+    optimization_paths()
     plt.show()
