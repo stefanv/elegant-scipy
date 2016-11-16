@@ -23,13 +23,13 @@ methods = ['Nelder-Mead',
            'TNC',
 #           'COBYLA',
            'SLSQP',
-#           'dogleg',
-#           'trust-ncg'
+           'dogleg',
+           'trust-ncg'
                ]
 
 
 def rosenbrock_f(a, b):
-    """Return the Rosenbrock function & Jacobian.
+    """Return the Rosenbrock function, Jacobian & Hessian.
 
     Parameters
     ----------
@@ -45,14 +45,18 @@ def rosenbrock_f(a, b):
         return (a - x)**2 + b * (y - x**2) ** 2
 
     def J(x, y):
-        return np.array([-2 * (a - x) + 4 * b * (y - x**2),
+        return np.array([-2 * (a - x) - 4 * b * x * (y - x**2),
                          2 * b * (y - x ** 2)])
 
-    return f, J
+    def H(x, y):
+        return np.array([[2, -4 * b * x],
+                         [-4 * b * x, 2 * b]])
+
+    return f, J, H
 
 
 def optimization_paths(axis):
-    rosenbrock, rosenbrock_J = rosenbrock_f(a=1, b=100)
+    rosenbrock, rosenbrock_J, rosenbrock_H = rosenbrock_f(a=1, b=100)
     path = {}
 
     x, y = np.ogrid[-2:2:0.05, -1:3:0.05]
@@ -74,6 +78,7 @@ def optimization_paths(axis):
         res = optimize.minimize(lambda p: rosenbrock(*p),
                                 x0=x0,
                                 jac=lambda p: rosenbrock_J(*p),
+                                hess=lambda p: rosenbrock_H(*p),
                                 method=method,
                                 callback=lambda p: path.append(p))
 
