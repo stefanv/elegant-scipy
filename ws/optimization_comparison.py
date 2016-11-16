@@ -18,7 +18,7 @@ methods = ['Nelder-Mead',
            'Powell',
            'CG',
            'BFGS',
-#           'Newton-CG',
+           'Newton-CG',
            'L-BFGS-B',
            'TNC',
 #           'COBYLA',
@@ -29,7 +29,7 @@ methods = ['Nelder-Mead',
 
 
 def rosenbrock_f(a, b):
-    """Return the Rosenbrock function.
+    """Return the Rosenbrock function & Jacobian.
 
     Parameters
     ----------
@@ -44,17 +44,21 @@ def rosenbrock_f(a, b):
     def f(x, y):
         return (a - x)**2 + b * (y - x**2) ** 2
 
-    return f
+    def J(x, y):
+        return np.array([-2 * (a - x) + 4 * b * (y - x**2),
+                         2 * b * (y - x ** 2)])
+
+    return f, J
 
 
 def optimization_paths(axis):
-    rosenbrock = rosenbrock_f(a=1, b=100)
+    rosenbrock, rosenbrock_J = rosenbrock_f(a=1, b=100)
     path = {}
 
     x, y = np.ogrid[-2:2:0.05, -1:3:0.05]
     ax.plot_surface(x, y, rosenbrock(x, y), rstride=1, cstride=1,
                     cmap='viridis', norm=LogNorm(), linewidth=0,
-                    edgecolor='none', alpha=1)
+                    edgecolor='none', alpha=0.4)
 
     ax.set_xlim([-2, 2.0])
     ax.set_ylim([-1, 3.0])
@@ -69,6 +73,7 @@ def optimization_paths(axis):
         path = [x0]
         res = optimize.minimize(lambda p: rosenbrock(*p),
                                 x0=x0,
+                                jac=lambda p: rosenbrock_J(*p),
                                 method=method,
                                 callback=lambda p: path.append(p))
 
