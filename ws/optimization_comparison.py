@@ -22,9 +22,7 @@ methods = ['Nelder-Mead',
            'TNC',
 #           'COBYLA',   # does not support callbacks
            'SLSQP',
-           'dogleg',
-           'trust-ncg'
-               ]
+           'trust-ncg']
 
 
 def rosenbrock_f(a, b):
@@ -59,15 +57,16 @@ def optimization_paths():
     path = {}
 
     fig, axes = plt.subplots(4, 3)
-    fig.delaxes(axes[0, 1])
+    fig.delaxes(axes[0, 0])
+    fig.delaxes(axes[0, 2])
     fig.suptitle('Comparison of Optimation Methods on Rosenbrock Function')
 
     x, y = np.ogrid[-2:2:0.05, -1:3:0.05]
     extent = (-2, 2, -1, 3)
 
     z = rosenbrock(x, y).T
-    axes[0, 0].matshow(z, norm=LogNorm(), origin='lower', extent=extent)
-    axes[0, 0].set_title('Cost Function')
+    axes[0, 1].matshow(z + 1e-3, norm=LogNorm(), origin='lower', extent=extent)
+    axes[0, 1].set_title('Cost Function')
 
     x0 = (-0.5, 2.5)
 
@@ -85,10 +84,10 @@ def optimization_paths():
         path = np.array(path)
         px, py = path.T
 
-        ax = axes.flat[n + 2]
+        ax = axes.flat[n + 3]
 
-        ax.contour(z, extent=extent, norm=LogNorm())
-        ax.plot(px, py, linewidth=3)
+        ax.contour(z, extent=extent, norm=LogNorm(), alpha=0.5)
+        ax.plot(px, py, linewidth=3, color='black')
         ax.set_aspect('equal')
         ax.scatter(path[-1, 0], path[-1, 1])
         ax.set_title(method)
