@@ -21,6 +21,34 @@ from skimage import transform
 from skimage.util import random_noise
 
 
+def gaussian_pyramid(image, levels=7):
+    """Make a Gaussian image pyramid.
+
+    Parameters
+    ----------
+    image : array of float
+        The input image.
+    max_layer : int, optional
+        The number of levels in the pyramid.
+
+    Returns
+    -------
+    pyramid : list of array of float
+        A list of Gaussian pyramid levels, starting with the top
+        (lowest resolution) level.
+    """
+    pyramid = [image]
+    rows, cols = image.shape[0], image.shape[1]
+
+    for level in range(levels):
+        rows = np.ceil(rows / 2)
+        cols = np.ceil(cols / 2)
+        blurred = ndi.gaussian_filter(image, sigma=2/3)
+        image = transform.resize(blurred, (rows, cols))
+        pyramid.append(image)
+
+    return pyramid[::-1]
+
 def mutual_information(A, B, normalized=True):
     """Compute the normalized mutual information.
 
@@ -118,19 +146,23 @@ def cost(p, X, Y):
     tf = build_tf(p)
     Y_prime = transform.warp(Y, tf, order=3)
 
-    return -1 * alignment(X, Y_prime)
+    #return -1 * alignment(X, Y_prime)
+    return np.sum((X - Y_prime)**2) / np.prod(X.shape)
 
 
 # Generalize this for N-d
 def register(A, B):
-    pyramid_A = tuple(transform.pyramid_gaussian(A, downscale=2))
-    pyramid_B = tuple(transform.pyramid_gaussian(B, downscale=2))
-    N = range(len(pyramid_A))
+    #pyramid_A = tuple(transform.pyramid_gaussian(A, downscale=2))
+    #pyramid_B = tuple(transform.pyramid_gaussian(B, downscale=2))
+    pyramid_A = gaussian_pyramid(A, levels=5)
+    pyramid_B = gaussian_pyramid(B, levels=5)
+
+    N = range(len(pyramid_A), 0, -1)
     image_pairs = zip(N, pyramid_A, pyramid_B)
 
     p = np.array([0, 0, 0])
 
-    for (n, X, Y) in reversed(list(image_pairs)):
+    for (n, X, Y) in image_pairs:
         if X.shape[0] < 5:
             continue
 
@@ -158,9 +190,10 @@ def register(A, B):
 if __name__ == "__main__":
     from skimage import data, transform, color
 
-    img0 = transform.rescale(color.rgb2gray(data.astronaut()), 0.3)
+    img0 = transform.rescale(color.rgb2gray(data.astronaut()), 0.4)
+    #img0 = color.rgb2gray(data.astronaut())
 
-    theta = 40
+    theta = 60
     img1 = transform.rotate(img0, theta)
     img1 = random_noise(img1, mode='gaussian', seed=0, mean=0, var=1e-3)
 
@@ -178,13 +211,13 @@ if __name__ == "__main__":
     ax2.imshow(corrected, cmap='gray')
     ax2.set_title('Registered image')
 
-    print('Calculating cost function profile...')
-    f, ax0 = plt.subplots()
-    angles = np.linspace(-theta - 20, -theta + 20, 51)
-    costs = [-1 * alignment(img0, transform.rotate(img1, angle)) for angle in angles]
-    ax0.plot(angles, costs)
-    ax0.set_title('Cost function around angle of interest')
-    ax0.set_xlabel('Angle')
-    ax0.set_ylabel('Cost')
+    ## print('Calculating cost function profile...')
+    ## f, ax0 = plt.subplots()
+    ## angles = np.linspace(-theta - 20, -theta + 20, 51)
+    ## costs = [-1 * alignment(img0, transform.rotate(img1, angle)) for angle in angles]
+    ## ax0.plot(angles, costs)
+    ## ax0.set_title('Cost function around angle of interest')
+    ## ax0.set_xlabel('Angle')
+    ## ax0.set_ylabel('Cost')
 
     plt.show()
