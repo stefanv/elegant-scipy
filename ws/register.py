@@ -49,6 +49,7 @@ def gaussian_pyramid(image, levels=7):
 
     return pyramid[::-1]
 
+
 def mutual_information(A, B, normalized=True):
     """Compute the normalized mutual information.
 
@@ -133,7 +134,8 @@ def alignment(A, B, sigma=1.5, normalized=True):
     I = mutual_information(A, B, normalized=normalized)
     G = np.sum(gradient_similarity(A, B, sigma=sigma))
 
-    return I * G
+#    return I * G
+    return G
 
 
 def build_tf(p):
@@ -144,7 +146,7 @@ def build_tf(p):
 
 def cost(p, X, Y):
     tf = build_tf(p)
-    Y_prime = transform.warp(Y, tf, order=3)
+    Y_prime = transform.warp(Y, tf, output_shape=X.shape, order=3)
 
     #return -1 * alignment(X, Y_prime)
     return np.sum((X - Y_prime)**2) / np.prod(X.shape)
@@ -188,36 +190,68 @@ def register(A, B):
 
 
 if __name__ == "__main__":
-    from skimage import data, transform, color
-
-    img0 = transform.rescale(color.rgb2gray(data.astronaut()), 0.4)
-    #img0 = color.rgb2gray(data.astronaut())
-
-    theta = 60
-    img1 = transform.rotate(img0, theta)
-    img1 = random_noise(img1, mode='gaussian', seed=0, mean=0, var=1e-3)
-
-    tf = register(img0, img1)
-    corrected = transform.warp(img1, tf, order=3)
-
-
+    from skimage import data, transform, color, io
     import matplotlib.pyplot as plt
 
-    f, (ax0, ax1, ax2) = plt.subplots(1, 3)
-    ax0.imshow(img0, cmap='gray')
-    ax0.set_title('Input image')
-    ax1.imshow(img1, cmap='gray')
-    ax1.set_title('Transformed image + noise')
-    ax2.imshow(corrected, cmap='gray')
-    ax2.set_title('Registered image')
+    dataset = 'prokudin-gorskii'
+    # dataset = 'astronaut'
 
-    ## print('Calculating cost function profile...')
-    ## f, ax0 = plt.subplots()
-    ## angles = np.linspace(-theta - 20, -theta + 20, 51)
-    ## costs = [-1 * alignment(img0, transform.rotate(img1, angle)) for angle in angles]
-    ## ax0.plot(angles, costs)
-    ## ax0.set_title('Cost function around angle of interest')
-    ## ax0.set_xlabel('Angle')
-    ## ax0.set_ylabel('Cost')
+    explore_rotation = False
 
-    plt.show()
+    if dataset == 'astronaut':
+        img0 = transform.rescale(color.rgb2gray(data.astronaut()), 0.4)
+
+        img0 = transform.rescale(color.rgb2gray(data.astronaut()), 0.3)
+
+        theta = 60
+        img1 = transform.rotate(img0, theta)
+        img1 = random_noise(img1, mode='gaussian', seed=0, mean=0, var=1e-3)
+
+        tf = register(img0, img1)
+        corrected = transform.warp(img1, tf, order=3)
+
+    elif dataset == 'prokudin-gorskii':
+        img_r = color.rgb2gray(io.imread('../images/prokudin_gorskii_00998_r_small.png'))
+        img_g = color.rgb2gray(io.imread('../images/prokudin_gorskii_00998_g_small.png'))
+        img_b = color.rgb2gray(io.imread('../images/prokudin_gorskii_00998_b_small.png'))
+
+        img_r = transform.rescale(img_r, 0.75)
+        img_g = transform.rescale(img_g, 0.75)
+        img_b = transform.rescale(img_b, 0.75)
+
+        final_shape = img_g.shape + (3,)
+        out = np.zeros(final_shape)
+
+        tf = register(img_g, img_r)
+        corrected_r = transform.warp(img_r, tf, output_shape=img_g.shape, order=3)
+
+        tf = register(img_g, img_b)
+        corrected_b = transform.warp(img_b, tf, output_shape=img_g.shape, order=3)
+
+        out[..., 0] = corrected_r
+        out[..., 1] = img_g
+        out[..., 2] = corrected_b
+
+        print('Writing output to /tmp/registered.png')
+        plt.imsave('/tmp/registered.png', out)
+
+    if explore_rotation:
+
+        f, (ax0, ax1, ax2) = plt.subplots(1, 3)
+        ax0.imshow(img0, cmap='gray')
+        ax0.set_title('Input image')
+        ax1.imshow(img1, cmap='gray')
+        ax1.set_title('Transformed image + noise')
+        ax2.imshow(corrected, cmap='gray')
+        ax2.set_title('Registered image')
+
+        print('Calculating cost function profile...')
+        f, ax0 = plt.subplots()
+        angles = np.linspace(-theta - 20, -theta + 20, 51)
+        costs = [-1 * alignment(img0, transform.rotate(img1, angle)) for angle in angles]
+        ax0.plot(angles, costs)
+        ax0.set_title('Cost function around angle of interest')
+        ax0.set_xlabel('Angle')
+        ax0.set_ylabel('Cost')
+
+        plt.show()
