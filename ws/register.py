@@ -134,35 +134,36 @@ def alignment(A, B, sigma=1.5, normalized=True):
     I = mutual_information(A, B, normalized=normalized)
     G = np.sum(gradient_similarity(A, B, sigma=sigma))
 
-#    return I * G
-    return G
+    return I * G
+#    return I
 
 
 def build_tf(p):
-    r, tx, ty = p
-    return transform.SimilarityTransform(rotation=r,
-                                         translation=(tx, ty))
+    rotation, shear, tx, ty = p
+    return transform.AffineTransform(rotation=rotation,
+                                     shear=shear,
+                                     translation=(tx, ty))
 
 
 def cost(p, X, Y):
     tf = build_tf(p)
     Y_prime = transform.warp(Y, tf, output_shape=X.shape, order=3)
 
-    #return -1 * alignment(X, Y_prime)
-    return np.sum((X - Y_prime)**2) / np.prod(X.shape)
+    return -1 * alignment(X, Y_prime)
+    #return np.sum((X - Y_prime)**2) / np.prod(X.shape)
 
 
 # Generalize this for N-d
 def register(A, B):
     #pyramid_A = tuple(transform.pyramid_gaussian(A, downscale=2))
     #pyramid_B = tuple(transform.pyramid_gaussian(B, downscale=2))
-    pyramid_A = gaussian_pyramid(A, levels=5)
-    pyramid_B = gaussian_pyramid(B, levels=5)
+    pyramid_A = gaussian_pyramid(A, levels=10)
+    pyramid_B = gaussian_pyramid(B, levels=10)
 
-    N = range(len(pyramid_A), 0, -1)
+    N = range(len(pyramid_A) - 1, -1, -1)
     image_pairs = zip(N, pyramid_A, pyramid_B)
 
-    p = np.array([0, 0, 0])
+    p = np.array([0, 0, 0, 0])
 
     for (n, X, Y) in image_pairs:
         if X.shape[0] < 5:
@@ -190,7 +191,7 @@ def register(A, B):
 
 
 if __name__ == "__main__":
-    from skimage import data, transform, color, io
+    from skimage import data, transform, color, io, img_as_float
     import matplotlib.pyplot as plt
 
     dataset = 'prokudin-gorskii'
@@ -211,13 +212,12 @@ if __name__ == "__main__":
         corrected = transform.warp(img1, tf, order=3)
 
     elif dataset == 'prokudin-gorskii':
-        img_r = color.rgb2gray(io.imread('../images/prokudin_gorskii_00998_r_small.png'))
-        img_g = color.rgb2gray(io.imread('../images/prokudin_gorskii_00998_g_small.png'))
-        img_b = color.rgb2gray(io.imread('../images/prokudin_gorskii_00998_b_small.png'))
+#        scaling = '_small'
+        scaling = ''
 
-        img_r = transform.rescale(img_r, 0.75)
-        img_g = transform.rescale(img_g, 0.75)
-        img_b = transform.rescale(img_b, 0.75)
+        img_r = color.rgb2gray(img_as_float(io.imread('../images/prokudin_gorskii_00998_r{}.png'.format(scaling))))
+        img_g = color.rgb2gray(img_as_float(io.imread('../images/prokudin_gorskii_00998_g{}.png'.format(scaling))))
+        img_b = color.rgb2gray(img_as_float(io.imread('../images/prokudin_gorskii_00998_b{}.png'.format(scaling))))
 
         final_shape = img_g.shape + (3,)
         out = np.zeros(final_shape)
